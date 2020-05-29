@@ -1,0 +1,7 @@
+# Created by .ignore support plugin (hsz.mobi)
+.idea/
+/datasets/embedding/wiki_100.utf8
+/datasets/BruceData/data/dev.txt
+/datasets/BruceData/data/test.txt
+/datasets/BruceData/data/train.txt
+/datasets/BruceData/data/wiki_100.utf8
