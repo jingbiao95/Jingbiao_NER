@@ -14,13 +14,15 @@ __author__ = 'JingbiaoLi'
 
 import tensorflow as tf
 
+UNK, PAD = "<UNK>", "<PAD>"  # 未知字，padding符号
 
-def prepare_dataset(sentences, word_to_id, ):
+
+def prepare_dataset(sentences, word_to_id, tag_to_id):
     """
     数据预处理，返回list其实包含
     -word_list
     -word_id_list
-    -word char indexs
+    -tag_list
     -tag_id_list
     :return:
     """
@@ -28,10 +30,10 @@ def prepare_dataset(sentences, word_to_id, ):
     data = []
     for s in sentences:
         word_list = [w[0] for w in s]
-        word_id_list = [word_to_id[w if w in word_to_id else '<UNK>'] for w in word_list]
+        word_id_list = [word_to_id.get(w, word_to_id.get(UNK)) for w in word_list]
         tag_list = [w[1] for w in s]
-        data.append([word_list, word_id_list, tag_list])
-
+        tag_id_list = [tag_to_id.get(tag, tag_to_id.get("O")) for tag in tag_list]
+        data.append([word_list, word_id_list, tag_list, tag_id_list])
     return data
 
 
@@ -109,7 +111,7 @@ def bio2bioes(tags):
     return bioes_tags
 
 
-def bulid_data(dataset, max_len, num_classes, tag_to_id):
+def bulid_data(dataset, max_len, num_classes, word_to_id, tag_to_id):
     """
     将数据转换为Model指定max_seq_len长度的序列
     :param dataset: 数据集的配置信息
@@ -119,10 +121,52 @@ def bulid_data(dataset, max_len, num_classes, tag_to_id):
     """
     x_data = [data[1] for data in dataset]
     x_data = tf.keras.preprocessing.sequence.pad_sequences(x_data, maxlen=max_len, dtype='int32', padding='post',
-                                                           truncating='post', value=0)
-    y_data = [data[2] for data in dataset]
-    y_data = [[tag_to_id.get(y) for y in sentence] for sentence in y_data]
+                                                           truncating='post', value=word_to_id.get("<PAD>"))
+    y_data = [data[3] for data in dataset]
     y_data = tf.keras.preprocessing.sequence.pad_sequences(y_data, maxlen=max_len, dtype='int32', padding='post',
                                                            truncating='post', value=tag_to_id.get("O"))
-    y_data = tf.keras.utils.to_categorical(y_data, num_classes=num_classes,)
+    y_data = tf.keras.utils.to_categorical(y_data, num_classes=num_classes, )
     return x_data, y_data
+
+
+def format_result(word_list, tag_list, ):
+    """
+
+    :param word_list:
+    :param tag_list:
+    :return:
+    """
+    entities = []
+    entity = []
+
+    for idx, (word, tag) in enumerate(zip(word_list, tag_list)):
+
+        if not check_label_continue(tag_list[idx - 1] if idx > 0 else None, tag) and entity:
+            entities.append(entity)
+            entity = []
+        entity.append([idx, word, tag])
+    else:
+        if entity:
+            entities.append(entity)
+
+    entity_results = []
+    for entity in entities:
+        if entity[0][2].startswith("B-"):
+            entity_results.append({
+                'begin': entity[0][0] + 1,
+                "end": entity[-1][0] + 1,
+                "words": "".join([word for idx, word, tag in entity]),
+                "type": entity[0][2].split("-")[-1]
+            })
+    return entity_results
+
+
+def check_label_continue(pre_tag, tag):
+    if tag is None:
+        raise Exception("current tag can't be None")
+    if pre_tag is None or tag.startswith("B-") or tag.startswith('S-'):
+        return False
+    if (tag.startswith("I-") or tag.startswith("E-")) and (
+            pre_tag.startswith("B-") or pre_tag.startswith("I-")) and tag.endwith(pre_tag.split("-")[-1]):
+        return True
+    return False

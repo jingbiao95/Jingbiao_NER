@@ -14,7 +14,7 @@ __author__ = 'JingbiaoLi'
 
 import os
 import tensorflow as tf
-from tensorflow.keras.layers import Dense, Embedding, LSTM, Bidirectional, Dropout, Input
+from tensorflow.keras.layers import Dense, Embedding, LSTM, Bidirectional, Dropout, Input, BatchNormalization
 
 
 class Config(object):
@@ -33,7 +33,7 @@ class Config(object):
         self.epochs = 20  # epoch数
         self.batch_size = 512  # mini-batch大小
         self.max_len = 200  # 每句话处理的长度
-        self.learn_rate = 1e-3  # 学习率
+        self.learn_rate = 1e-4  # 学习率
 
         # 模型训练结果
         self.save_path = os.path.join(self.dataset.data_dir, "saved_dict", self.model_name + ".h5")
@@ -54,11 +54,13 @@ class Model(tf.keras.Model):
     def build(self, input_shape):
         super(Model, self).build(input_shape)
 
-    def create_model(self, input_shape) -> tf.keras.Model:
+    def create_model(self, input_shape):
         model_input = Input(shape=input_shape, dtype='float64')
         x = self.embedding(model_input)
         x = self.biRNN(x)
+        x = BatchNormalization()(x)
         x = self.dropout(x)
         model_output = self.out_put(x)
         model = tf.keras.Model(inputs=model_input, outputs=model_output)
+
         return model
